@@ -46,7 +46,7 @@ public class Worker implements Runnable {
         }
     }
 
-    public List<KeyValue> map(String content) {
+    public List<KeyValue> map(String fileName, String content) {
         List<KeyValue> res = new ArrayList<>();
         String[] tokens = content.split("\\W+");
         for (String token : tokens) {
@@ -66,18 +66,18 @@ public class Worker implements Runnable {
             System.err.println("Воркер " + id + " упал с ошибкой, читая файл " + fileName);
             return;
         }
-        List<KeyValue> kvs = map(content);
+        List<KeyValue> keyValues = map(fileName, content);
         Map<Integer, BufferedWriter> writers = new HashMap<>();
         try {
-            for (KeyValue kv : kvs) {
-                int bucket = (kv.key().hashCode() & Integer.MAX_VALUE) % nReduce;
+            for (KeyValue keyValue : keyValues) {
+                int bucket = (keyValue.key().hashCode() & Integer.MAX_VALUE) % nReduce;
                 BufferedWriter bw = writers.get(bucket);
                 if (bw == null) {
                     String fName = String.format("mr-%d-%d", mapId, bucket);
                     bw = new BufferedWriter(new FileWriter(fName, true));
                     writers.put(bucket, bw);
                 }
-                bw.write(kv.key() + "\t" + kv.value());
+                bw.write(keyValue.key() + "\t" + keyValue.value());
                 bw.newLine();
             }
         } catch (IOException e) {
@@ -92,7 +92,7 @@ public class Worker implements Runnable {
         }
     }
 
-    public String reduce(List<String> values) {
+    public String reduce(String key, List<String> values) {
         int sum = 0;
         for (String v : values) {
             try {
@@ -124,9 +124,9 @@ public class Worker implements Runnable {
         Collections.sort(keys);
         String outName = String.format("mr-out-%d", reduceId);
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(outName))) {
-            for (String k : keys) {
-                String result = reduce(groups.get(k));
-                bw.write(k + " " + result);
+            for (String key : keys) {
+                String result = reduce(key, groups.get(key));
+                bw.write(key + " " + result);
                 bw.newLine();
             }
         } catch (IOException e) {
